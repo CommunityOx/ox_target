@@ -1,6 +1,7 @@
 -- FX Information
 fx_version 'cerulean'
 use_experimental_fxv2_oal 'yes'
+nui_callback_strict_mode 'true'
 lua54 'yes'
 game 'gta5'
 
