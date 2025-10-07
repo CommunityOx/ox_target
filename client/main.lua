@@ -288,6 +288,7 @@ local function startTargeting()
             end
         end
 
+
         if newOptions then
             if hasTarget == 1 and (totalOptions - hidden) > 1 then
                 hasTarget = true
@@ -312,10 +313,37 @@ local function startTargeting()
                         })
                 end
 
+                -- Filter options with showIf (only when showing the menu)
+                local function filterShowIf(tbl)
+                    if not tbl then return nil end
+                    local filtered = {}
+                    for k, v in pairs(tbl) do
+                        if type(v) == 'table' then
+                            local skip = false
+                            if v.showIf then
+                                local ok, res = pcall(v.showIf, currentTarget.entity, currentTarget.distance, currentTarget.coords, v.name)
+                                if not ok or not res then skip = true end
+                            end
+                            if not skip then filtered[k] = v end
+                        end
+                    end
+                    return filtered
+                end
+
+                local filteredOptions = {}
+                for k, v in pairs(options) do
+                    filteredOptions[k] = filterShowIf(v)
+                end
+
+                local filteredZones = {}
+                for i = 1, #zones do
+                    filteredZones[i] = filterShowIf(zones[i])
+                end
+
                 SendNuiMessage(json.encode({
                     event = 'setTarget',
-                    options = options,
-                    zones = zones,
+                    options = filteredOptions,
+                    zones = filteredZones,
                 }, { sort_keys = true }))
             end
 
