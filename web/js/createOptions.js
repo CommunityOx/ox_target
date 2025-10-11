@@ -6,7 +6,8 @@ function onClick() {
   // when nuifocus is disabled after a click, the hover event is never released
   this.style.pointerEvents = "none";
 
-  fetchNui("select", [this.targetType, this.targetId, this.zoneId]);
+  // Send the unique id as the 4th element
+  fetchNui("select", [this.targetType, this.targetId, this.zoneId, this.optionId]);
   // is there a better way to handle this? probably
   setTimeout(() => (this.style.pointerEvents = "auto"), 100);
 }
@@ -24,6 +25,7 @@ export function createOptions(type, data, id, zoneId) {
   option.targetType = type;
   option.targetId = id;
   option.zoneId = zoneId;
+  option.optionId = data.id; // Pass the unique id from Lua
 
   option.addEventListener("click", onClick);
   optionsWrapper.appendChild(option);
