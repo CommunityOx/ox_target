@@ -288,6 +288,7 @@ local function startTargeting()
             end
         end
 
+
         if newOptions then
             if hasTarget == 1 and (totalOptions - hidden) > 1 then
                 hasTarget = true
@@ -312,10 +313,45 @@ local function startTargeting()
                         })
                 end
 
+                -- Filter options with showIf (only when showing the menu)
+                local function filterShowIf(tbl)
+                    if not tbl then return {} end
+                    local filtered = {}
+                    for i = 1, #tbl do
+                        local v = tbl[i]
+                        if type(v) == 'table' then
+                            -- Assign a unique id if not present
+                            if not v.id then
+                                v.id = v.name or (v.label .. '_' .. tostring(i))
+                            end
+                            local include = true
+                            if v.showIf then
+                                local ok, res = pcall(v.showIf, currentTarget.entity, currentTarget.distance, currentTarget.coords, v.name)
+                                if not ok or not res then include = false end
+                            end
+                            if include then
+                                table.insert(filtered, v)
+                            end
+                        end
+                    end
+                    return filtered
+                end
+
+                local filteredOptions = {}
+                for k, v in pairs(options) do
+                    filteredOptions[k] = filterShowIf(v)
+                end
+
+                local filteredZones = {}
+                for i = 1, #zones do
+                    filteredZones[i] = filterShowIf(zones[i])
+                end
+
+                -- Send filtered options with their ids to NUI
                 SendNuiMessage(json.encode({
                     event = 'setTarget',
-                    options = options,
-                    zones = zones,
+                    options = filteredOptions,
+                    zones = filteredZones,
                 }, { sort_keys = true }))
             end
 
@@ -406,9 +442,23 @@ RegisterNUICallback('select', function(data, cb)
     cb(1)
 
     local zone = data[3] and nearbyZones[data[3]]
+    local optionId = data[4] -- expects NUI to send the option id as the 4th element
+
+    local function findOptionById(tbl, id)
+        for i = 1, #tbl do
+            if tbl[i] and tbl[i].id == id then
+                return tbl[i]
+            end
+        end
+    end
 
     ---@type OxTargetOption?
-    local option = zone and zone.options[data[2]] or options[data[1]][data[2]]
+    local option = nil
+    if zone then
+        option = findOptionById(zone.options, optionId)
+    else
+        option = findOptionById(options[data[1]], optionId)
+    end
 
     if option then
         if option.openMenu then
@@ -433,12 +483,12 @@ RegisterNUICallback('select', function(data, cb)
             state.setNuiFocus(false)
         end
 
-        currentTarget.zone = zone?.id
+        currentTarget.zone = zone and zone.id or nil
 
         if option.onSelect then
             option.onSelect(option.qtarget and currentTarget.entity or getResponse(option))
         elseif option.export then
-            exports[option.resource or zone.resource][option.export](nil, getResponse(option))
+            exports[option.resource or (zone and zone.resource)][option.export](nil, getResponse(option))
         elseif option.event then
             TriggerEvent(option.event, getResponse(option))
         elseif option.serverEvent then
@@ -450,7 +500,7 @@ RegisterNUICallback('select', function(data, cb)
         if option.menuName == 'home' then return end
     end
 
-    if not option?.openMenu and IsNuiFocused() then
+    if not (option and option.openMenu) and IsNuiFocused() then
         state.setActive(false)
     end
 end)
